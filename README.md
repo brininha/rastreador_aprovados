@@ -13,10 +13,10 @@
 
 
 
-## O Problema
+## Problema identificado
 Atualmente, a conferência de aprovados é feita de forma manual, exigindo que a equipe do CPE analise listas com milhares de nomes para encontrar os alunos do cursinho. Isso é lento, cansativo e sujeito a erros humanos.
 
-## A Solução
+## Solução proposta
 O rastreador de aprovados é um script em Python que utiliza comparação difusa de texto para identificar aprovações em segundos, mesmo que o nome do aluno tenha pequenas diferenças de grafia em relação à lista oficial.
 
 ### Principais funcionalidades
