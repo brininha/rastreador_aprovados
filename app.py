@@ -127,7 +127,7 @@ st.markdown("""
 col_img, col_titulo = st.columns([1, 9], vertical_alignment="center")
 
 with col_img:
-   st.image("15.png", width=120)
+   st.image("logo.png", width=120)
 with col_titulo:   
  st.markdown(
     "<h2 class='titulo'> Rastreador de<br>Aprovados </h2>", unsafe_allow_html=True)
