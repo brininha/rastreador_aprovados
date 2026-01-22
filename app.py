@@ -21,7 +21,7 @@ def converte_para_tabela():
    st.session_state.df_resultado_conversao = backend.extrair_tabela_pdf(arquivo_tabela_pdf)
 
 st.set_page_config(
-    page_title="Rastreador",
+    page_title="Rastreador de Aprovados",
     page_icon="🦉",
     layout="centered"
 )
