@@ -15,7 +15,7 @@ def normalizar_texto(texto):
     if pd.isna(texto) or texto == "":
         return ""
     texto_limpo = unidecode(str(texto).upper())
-    # Substitui quebras de linha por espaço para evitar quebra de nomes
+    # Substitui quebras de linha por espaço
     texto_limpo = texto_limpo.replace('\n', ' ')
     return re.sub(r'\s+', ' ', texto_limpo).strip()
 
@@ -33,7 +33,6 @@ def obter_fragmentos_cpf(cpf):
     """
     cpf_limpo = limpar_numeros(cpf)
     
-    # CPF precisa ter 11 dígitos para essa lógica funcionar bem
     if len(cpf_limpo) < 11:
         return []
     
@@ -41,7 +40,7 @@ def obter_fragmentos_cpf(cpf):
         cpf_limpo[0:3],   # 123.***
         cpf_limpo[3:6],   # ***.456.***
         cpf_limpo[6:9],   # ***.***.789
-        cpf_limpo[9:11]   # ***-00 (Final)
+        cpf_limpo[9:11]   # ***-00
     ]
     return fragmentos
 
@@ -61,39 +60,49 @@ def identificar_colunas(df):
     """Tenta adivinhar colunas de Nome e CPF no DataFrame de alunos."""
     cols_lower = [c.lower() for c in df.columns]
     
-    # Busca coluna de NOME
     keywords_nome = ['nome', 'candidato', 'aluno', 'estudante']
     col_nome = next((df.columns[i] for i, c in enumerate(cols_lower) if any(k in c for k in keywords_nome)), None)
     if not col_nome:
         cols_texto = df.select_dtypes(include=['object']).columns
         col_nome = cols_texto[0] if len(cols_texto) > 0 else df.columns[0]
 
-    # Busca coluna de CPF/DOC
     keywords_doc = ['cpf', 'doc', 'inscrição', 'inscricao', 'rg']
     col_cpf = next((df.columns[i] for i, c in enumerate(cols_lower) if any(k in c for k in keywords_doc)), None)
 
     return col_nome, col_cpf
 
 # ==========================================
-# LÓGICA DE BUSCA EM PDF (BAG OF WORDS)
+# LÓGICA DE LEITURA DE TEXTO (PDF E TXT)
 # ==========================================
 
 def carregar_texto_pdf(arquivo_pdf):
-    """Extrai todo o texto do PDF como uma única string gigante normalizada."""
+    """Extrai texto do PDF via pdfplumber."""
     texto_completo = ""
     try:
         with pdfplumber.open(arquivo_pdf) as pdf:
             for page in pdf.pages:
-                texto_pagina = page.extract_text()
-                if texto_pagina:
-                    texto_completo += " " + texto_pagina
+                t = page.extract_text()
+                if t: texto_completo += " " + t
         return normalizar_texto(texto_completo)
-    except Exception as e:
+    except:
         return ""
 
-def buscar_em_texto_corrido(df_alunos, texto_pdf_norm, col_nome, col_cpf, usar_validacao_cpf):
+def carregar_texto_txt(arquivo_txt):
+    """Lê arquivo TXT tentando UTF-8 e depois Latin-1."""
+    try:
+        # Tenta UTF-8 (Padrão web/linux)
+        conteudo = arquivo_txt.read().decode("utf-8")
+    except UnicodeDecodeError:
+        # Se falhar, tenta Latin-1 (Comum no Windows antigo/Excel)
+        arquivo_txt.seek(0)
+        conteudo = arquivo_txt.read().decode("latin-1")
+    
+    return normalizar_texto(conteudo)
+
+def buscar_em_texto_corrido(df_alunos, texto_norm, col_nome, col_cpf, usar_validacao_cpf):
+    """Lógica unificada para qualquer arquivo de texto (PDF ou TXT)"""
     resultados = []
-    total_chars = len(texto_pdf_norm)
+    total_chars = len(texto_norm)
 
     for idx, row in df_alunos.iterrows():
         nome_original = row[col_nome]
@@ -102,7 +111,7 @@ def buscar_em_texto_corrido(df_alunos, texto_pdf_norm, col_nome, col_cpf, usar_v
         if len(nome_busca) < 4: continue 
 
         # 1. Busca Exata do Nome
-        index_encontrado = texto_pdf_norm.find(nome_busca)
+        index_encontrado = texto_norm.find(nome_busca)
         
         match_encontrado = False
         status = ""
@@ -113,21 +122,19 @@ def buscar_em_texto_corrido(df_alunos, texto_pdf_norm, col_nome, col_cpf, usar_v
             match_encontrado = True
             score = 100
             
-            # 2. Validação Contextual por CPF (Multi-fragmento)
+            # 2. Validação Contextual por CPF
             if usar_validacao_cpf and col_cpf:
                 cpf_aluno = row[col_cpf]
                 fragmentos = obter_fragmentos_cpf(cpf_aluno)
                 
                 if fragmentos:
-                    # Cria janela de contexto (ex: 50 caracteres antes e depois do nome)
+                    # Janela de contexto
                     inicio_ctx = max(0, index_encontrado - 50)
                     fim_ctx = min(total_chars, index_encontrado + len(nome_busca) + 50)
-                    contexto = texto_pdf_norm[inicio_ctx:fim_ctx]
+                    contexto = texto_norm[inicio_ctx:fim_ctx]
                     
-                    # Limpa contexto para manter só números
                     contexto_numerico = re.sub(r'\D', '', contexto)
                     
-                    # Verifica se ALGUM fragmento está presente no contexto
                     match_cpf = False
                     frag_encontrado = ""
                     
@@ -135,7 +142,7 @@ def buscar_em_texto_corrido(df_alunos, texto_pdf_norm, col_nome, col_cpf, usar_v
                         if frag in contexto_numerico:
                             match_cpf = True
                             frag_encontrado = frag
-                            break # Achou um, já vale
+                            break
                     
                     if match_cpf:
                         status = "✅ Aprovado (Confirmado)"
@@ -179,14 +186,20 @@ def processar_conferencia(arquivo_alunos, arquivo_lista, usar_cpf=False):
     # 2. Verificar tipo da Lista Oficial
     nome_arquivo_lista = arquivo_lista.name.lower()
     
-    # ROTA A: PDF (Texto Corrido)
+    texto_extraido = None
+    
+    # ROTA A: Arquivos de Texto (PDF ou TXT)
     if nome_arquivo_lista.endswith('.pdf'):
-        texto_pdf = carregar_texto_pdf(arquivo_lista)
-        if not texto_pdf:
-            return pd.DataFrame({"Erro": ["PDF ilegível (pode ser imagem)."]})
-        return buscar_em_texto_corrido(df_alunos, texto_pdf, col_nome_aluno, col_cpf_aluno, usar_cpf)
+        texto_extraido = carregar_texto_pdf(arquivo_lista)
+    elif nome_arquivo_lista.endswith('.txt'):
+        texto_extraido = carregar_texto_txt(arquivo_lista)
 
-    # ROTA B: Excel/CSV (Comparação Linha a Linha - Mantida igual)
+    if texto_extraido is not None:
+        if not texto_extraido:
+            return pd.DataFrame({"Erro": ["Arquivo vazio ou ilegível."]})
+        return buscar_em_texto_corrido(df_alunos, texto_extraido, col_nome_aluno, col_cpf_aluno, usar_cpf)
+
+    # ROTA B: Excel/CSV (Tabelas estruturadas)
     else:
         df_oficial = carregar_dataframe(arquivo_lista)
         col_nome_lista, col_cpf_lista = identificar_colunas(df_oficial)
@@ -215,7 +228,6 @@ def processar_conferencia(arquivo_alunos, arquivo_lista, usar_cpf=False):
                     doc_aluno = limpar_numeros(row[col_cpf_aluno])
                     doc_lista = limpar_numeros(df_oficial.iloc[index_match][col_cpf_lista])
                     
-                    # Tenta achar qualquer pedaço do CPF
                     fragmentos = obter_fragmentos_cpf(doc_aluno)
                     match_doc = False
                     if fragmentos:

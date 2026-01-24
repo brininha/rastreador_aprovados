@@ -93,7 +93,7 @@ with tab1:
             # ATENÇÃO: Aqui adicionamos "pdf" na lista de tipos aceitos
             arquivo_lista_vestibular = st.file_uploader(
                 "Upload Lista Oficial", 
-                type=["csv", "xlsx", "pdf"], 
+                type=["csv", "xlsx", "pdf", 'txt'], 
                 key="a2", 
                 label_visibility="collapsed"
             )
