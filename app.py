@@ -1,228 +1,120 @@
 import streamlit as st
-
 from streamlit_extras.stylable_container import stylable_container
-
 import rastreador_aprovados as backend
 
+# Inicialização de sessão
 if "df_resultado_conferencia" not in st.session_state:
     st.session_state.df_resultado_conferencia = None
 
-if "df_resultado_conversao" not in st.session_state:
-    st.session_state.df_resultado_conversao = None
-
+# Funções de Callback
 def realiza_conferencia():
-   st.session_state.df_resultado_conferencia = backend.processar_conferencia(
-        arquivo_lista_alunos,
-        arquivo_lista_vestibular,
-        st.session_state.opcao == "Nome + CPF"
-    )
+    if arquivo_lista_alunos and arquivo_lista_vestibular:
+        with st.spinner('Lendo arquivos e cruzando dados... Isso pode levar alguns segundos.'):
+            st.session_state.df_resultado_conferencia = backend.processar_conferencia(
+                arquivo_lista_alunos,
+                arquivo_lista_vestibular,
+                st.session_state.opcao == "Nome + CPF"
+            )
+    else:
+        st.error("Por favor, faça o upload dos dois arquivos.")
 
-def converte_para_tabela():
-   st.session_state.df_resultado_conversao = backend.extrair_tabela_pdf(arquivo_tabela_pdf)
-
+# Configuração da página
 st.set_page_config(
-    page_title="Rastreador",
+    page_title="Rastreador de Aprovados",
     page_icon="🦉",
     layout="centered"
 )
 
+# Estilização CSS
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800&display=swap');
 
-            
-/* Aplica ao corpo do app */
-    html, body, [data-testid="stAppViewContainer"], .stApp {
-        font-family: 'Poppins', sans-serif !important;
-    }
-
-
-  
-
-.titulo {
-    font-family: 'Poppins', sans-serif !important;
-    font-weight: 800;
-    letter-spacing: -0.02em;
-    line-height: 1.1;
-    font-size: 20px !important;
-}
-            
-            /* Estiliza o rótulo (Label) "Método:" */
-    div[data-testid="stRadio"] > label {
-        font-size: 20px !important;
-        color: #ffff !important;
-        
-    }
-    div[data-testid="stRadio"] {
-    margin-left: 20px !important;
+/* Fonte global */
+html, body, [data-testid="stAppViewContainer"], .stApp {
+  font-family: 'Poppins', sans-serif !important;
 }
 
-    /* Estiliza as opções ("Nome Completo", etc) */
-    div[data-testid="stRadio"] div[role="radiogroup"] label p {
-        font-size: 15px !important;
-        color: #ffff !important;
-        
-    }
-            
-            /* 2. ESTILO DOS UPLOADERS (Laranja Translúcido) */
-    [data-testid='stFileUploaderDropzone'] {
-        min-height: 100px !important;
-        margin: 0 auto !important;
-        width: 90% !important;
-        
-        /* Laranja translúcido */
-        background-color: rgba(239, 123, 23, 0.15) !important; 
-        border: 2px dashed rgba(239, 123, 23, 0.5) !important;
-        border-radius: 8px !important;
-        
-        position: relative;
-        transition: all 0.3s ease-in-out;
-    }
+/* Título */
+.titulo { font-weight: 800; font-size: 28px !important; margin: 0; }
 
-    /* Hover: Fica mais forte quando passa o mouse */
-    [data-testid='stFileUploaderDropzone']:hover {
-        background-color: rgba(239, 123, 23, 0.25) !important;
-        border-color: #ef7b17 !important;
-    }
+/* Botão principal */
+div.stButton > button {
+  background-color: #ef7b17 !important;
+  color: white !important;
+  border-radius: 8px !important;
+}
 
-    /* 3. LIMPEZA (Esconde os textos e ícones originais do Streamlit) */
-    [data-testid='stFileUploaderDropzone'] > div:first-child,
-    [data-testid='stFileUploaderDropzone'] span, 
-    [data-testid='stFileUploaderDropzone'] small,
-    [data-testid='stFileUploaderDropzone'] svg {
-        display: none !important;
-    }
-
-    /* 4. TEXTO NOVO (Configuração Base Centralizada) */
-    [data-testid='stFileUploaderDropzone']::after {
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        text-align: center;
-        font-weight: bold;
-        font-size: 14px;
-        color: white; 
-        width: 80%;
-        pointer-events: none;
-        white-space: pre-wrap; /* Permite pular linha */
-        content: "Solte o arquivo aqui"; /* Texto de segurança */
-    }
- 
-             /* Estiliza o botão BUSCAR */
-    div.stButton > button {
-        background-color: #ef7b17 !important; /* Sua cor laranja */
-        color: white !important;              /* Texto branco */
-        border: 1px solid #ef7b17 !important; /* Borda da mesma cor */
-        font-weight: bold !important;
-        border-radius: 8px !important;        /* Borda arredondada */
-        width: auto !important;
-        float: right !important;
-                     
-                                            
-
-    /* Efeito ao passar o mouse (fica um pouco mais escuro/interativo) */
-    div.stButton > button:hover {
-        background-color: #d6690f !important; /* Um laranja levemente mais escuro */
-        border-color: #d6690f !important;
-        color: white !important;
-    }
-    
-    /* Efeito ao clicar (foco) - Remove borda vermelha padrão do Streamlit */
-    div.stButton > button:focus {
-        box-shadow: none !important;
-        color: white !important;
-    }
+/* Mensagens do Dropzone */
+[data-testid="stFileUploaderDropzoneInstructions"] > div > span { display: none; }
+[data-testid="stFileUploaderDropzoneInstructions"] > div::after {
+   content: "Solte seu arquivo aqui";
+   display: block;
+   font-size: 16px;
+   margin-bottom: 5px;
+}
+[data-testid="stFileUploaderDropzoneInstructions"] > div > small { display: none; }
+[data-testid="stFileUploaderDropzoneInstructions"] > div::before {
+   content: "Limite de 1GB • CSV, XLSX, PDF, TXT";
+   display: block;
+   font-size: 12px;
+   color: #666;
+   margin-bottom: 8px;
 }
 </style>
 """, unsafe_allow_html=True)
 
-#-------------------------------------------------------------------------------
-
-
+# Cabeçalho
 col_img, col_titulo = st.columns([1, 9], vertical_alignment="center")
-
 with col_img:
    st.image("logo.png", width=120)
 with col_titulo:   
- st.markdown(
-    "<h2 class='titulo'> Rastreador de<br>Aprovados </h2>", unsafe_allow_html=True)
+ st.markdown("<h2 class='titulo'> Rastreador de<br>Aprovados</h2>", unsafe_allow_html=True)
 
-tab1, tab2 = st.tabs(["Conferência", "Conversor PDF"])
+# Área principal do app
+# Aqui adicionamos 'color: white' para garantir que DENTRO do fundo azul o texto seja sempre branco
+with stylable_container(
+    key="meu_card",
+    css_styles="{background-color: #15355B; border-radius: 15px; padding: 30px; color: white;}"
+):
+    st.markdown('<h3 style="color:white;">Conferência de listas</h3>', unsafe_allow_html=True)
+    st.info("Agora aceita arquivos PDF e TXT diretamente! O sistema buscará o nome dos alunos dentro do arquivo da lista oficial.")
 
-with tab1:
+    # Opções de método
+    st.radio(
+        "Método de validação:",
+        ["Nome completo", "Nome + CPF"],
+        horizontal=True,
+        key="opcao",
+        help="Se escolher nome + CPF, o sistema procurará o nome do aluno e verificará se algum fragmento do CPF dele está próximo no texto."
+    )
 
-    with stylable_container(
-        key="meu_card",
-        css_styles="""
-            {
-                background-color: #15355B; 
-                border-radius: 15px;
-                padding: 50px;
-                box-shadow: 2px 2px 10px rgba(0,0,0,0.1);
-            }
-        """
-    ):
-        
-        
-        st.markdown('<h2 style="color:white; padding:0; font-size: 25px; text-align: left;   margin-left: 20px !important;">Conferência de Listas</h2>', unsafe_allow_html=True)
+    col1, col2 = st.columns(2)
 
-# ---------------
-        st.markdown('<div style="margin-top: -30px;"></div>', unsafe_allow_html=True) 
-# -----------------------
+    with col1:
+        st.markdown('**1. Alunos do cursinho**')
+        arquivo_lista_alunos = st.file_uploader(
+            "Upload da lista de alunos", 
+            type=["csv", "xlsx"], 
+            key="a1", 
+            label_visibility="collapsed"
+        )
 
-        st.radio(
-    "Método:",
-    ["Nome Completo", "Nome + CPF"],
-    horizontal=True,
-    key="opcao",
-)
+    with col2:
+        st.markdown('**2. Lista oficial**')
+        arquivo_lista_vestibular = st.file_uploader(
+            "Upload da lista oficial", 
+            type=["csv", "xlsx", "pdf", "txt"], 
+            key="a2", 
+            label_visibility="collapsed"
+        )
 
-        col1, col2 = st.columns(2)
+    st.markdown("<br>", unsafe_allow_html=True)
 
-        with col1:
-    
-         st.markdown('<h2 style="color:white; padding:5px; font-size: 15px; text-align: center;  ">🧑‍🏫Lista de Alunos</h2>', unsafe_allow_html=True)
-         arquivo_lista_alunos = st.file_uploader("Arquivo 1", type=["csv", "xlsx"], key="a1", label_visibility="collapsed")
+    if st.button("Buscar", on_click=realiza_conferencia, width='stretch'):
+        pass
 
-        with col2:
-         st.markdown('<h2 style="color:white; padding:5px; font-size: 15px; text-align: center;  ">📑Lista do Vestibular</h2>', unsafe_allow_html=True)
-         arquivo_lista_vestibular = st.file_uploader("Arquivo 2", type=["csv", "xlsx"], key="a2", label_visibility="collapsed")
-    
-
-         col_vazia, col_botao = st.columns([2, 1])
-         with col_botao:
-          st.button("Buscar", on_click=realiza_conferencia)
-
-        df_bottom_conferencia = st.empty()
-        if st.session_state.df_resultado_conferencia is not None:
-            df_bottom_conferencia.dataframe(st.session_state.df_resultado_conferencia)
-
-
-
-with tab2:
-     with stylable_container(
-        key="meu_card2",
-        css_styles="""
-            {
-                background-color: #15355B;
-                border-radius: 15px;
-                padding: 50px;
-                box-shadow: 2px 2px 10px rgba(0,0,0,0.1);
-            }
-        """
-    ):
-        
-        st.markdown('<h2 style="color:white; padding:0; font-size: 25px; text-align: left; ">Extrator de Tabelas em Arquivos PDF<br></h2>', unsafe_allow_html=True)
-        st.markdown('<h7 style="color:white; padding:0; font-size: 15px; text-align: left; margin-top: 10px; ">Use isso para converter listas de aprovados que estão no formato PDF.<br> O sistema tentará criar um arquivo organizado no formato padrão do Excel.</h7>', unsafe_allow_html=True)
-
-        st.markdown('<h2 style="color:white; padding:5px; font-size: 15px; text-align: center;  ">🗂️</h2>', unsafe_allow_html=True)
-        arquivo_tabela_pdf = st.file_uploader("PDF", type=["pdf"],  label_visibility="collapsed", key="conv_pdf")
-
-        col_vazia2, col_botao2 = st.columns([2, 1])
-        with col_botao2:
-         st.button("Converter para Tabela", key= "btn_tb2", on_click=converte_para_tabela)
-    
-        df_bottom_conversao = st.empty()
-        if st.session_state.df_resultado_conversao is not None:
-            df_bottom_conversao.dataframe(st.session_state.df_resultado_conversao)       
+    # Exibição dos resultados
+    if st.session_state.df_resultado_conferencia is not None:
+        st.write("### Resultado da análise:")
+        st.dataframe(st.session_state.df_resultado_conferencia, width='stretch')
