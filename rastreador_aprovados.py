@@ -99,17 +99,27 @@ def carregar_texto_txt(arquivo_txt):
     return normalizar_texto(conteudo)
 
 def buscar_em_texto_corrido(df_alunos, texto_norm, col_nome, col_cpf, usar_validacao_cpf):
-    """Busca otimizada no textão extraído."""
+    """Busca otimizada no textão extraído com resgate para nomes longos."""
     resultados = []
     total_chars = len(texto_norm)
 
     for idx, row in df_alunos.iterrows():
-        nome_original = row[col_nome]
+        nome_original = str(row[col_nome])
         nome_busca = normalizar_texto(nome_original)
         
         if len(nome_busca) < 4: continue 
 
+        # --- LÓGICA DE BUSCA HÍBRIDA ---
+        tipo_match = "Exato"
         index_encontrado = texto_norm.find(nome_busca)
+        
+        # Se não achou e o nome é longo, tenta a "Busca de Resgate" (primeiros 20 chars)
+        if index_encontrado == -1 and len(nome_busca) > 20:
+            nome_parcial = nome_busca[:20] # Pega os primeiros 20 caracteres
+            index_encontrado = texto_norm.find(nome_parcial)
+            if index_encontrado != -1:
+                tipo_match = "Parcial (Nome Longo)"
+        # -------------------------------
         
         if index_encontrado != -1:
             match_cpf = False
@@ -117,14 +127,17 @@ def buscar_em_texto_corrido(df_alunos, texto_norm, col_nome, col_cpf, usar_valid
             status = ""
             obs = ""
             
-            # Validação de CPF (Opcional)
+            # Validação de CPF
             if usar_validacao_cpf and col_cpf:
                 cpf_aluno = row[col_cpf]
                 fragmentos = obter_fragmentos_cpf(cpf_aluno)
                 
                 if fragmentos:
+                    # Define a janela de busca de CPF
                     inicio = max(0, index_encontrado - 50)
-                    fim = min(total_chars, index_encontrado + len(nome_busca) + 50)
+                    # Se foi match parcial, usamos o tamanho do nome original para projetar o fim
+                    fim = min(total_chars, index_encontrado + len(nome_busca) + 80)
+                    
                     contexto_numerico = re.sub(r'\D', '', texto_norm[inicio:fim])
                     
                     for frag in fragmentos:
@@ -134,22 +147,22 @@ def buscar_em_texto_corrido(df_alunos, texto_norm, col_nome, col_cpf, usar_valid
                             break
                     
                     if match_cpf:
-                        status = "✅ Aprovado (Confirmado)"
-                        obs = f"Nome e fragmento CPF ({frag_encontrado}) encontrados."
+                        status = f"✅ Aprovado ({tipo_match})"
+                        obs = f"Nome e CPF ({frag_encontrado}) conferem."
                     else:
                         status = "⚠️ Verificar (CPF Divergente)"
-                        obs = "Nome encontrado, mas CPF não bateu no contexto."
+                        obs = f"Nome encontrado ({tipo_match}), mas CPF não bateu no contexto."
                 else:
-                    status = "✅ Aprovado (Nome encontrado)"
+                    status = f"✅ Aprovado ({tipo_match})"
                     obs = "Sem CPF para validar."
             else:
-                status = "✅ Aprovado (Nome encontrado)"
+                status = f"✅ Aprovado ({tipo_match})"
                 obs = "Validação apenas por nome."
 
             resultados.append({
                 "Aluno CPE": nome_original,
-                "Nome Detectado": nome_busca,
-                "Similaridade": "100%",
+                "Nome Detectado": nome_busca if tipo_match == "Exato" else nome_busca[:20] + "...",
+                "Similaridade": "100%" if tipo_match == "Exato" else "Parcial",
                 "Status": status,
                 "Observação": obs
             })
@@ -161,7 +174,7 @@ def buscar_em_texto_corrido(df_alunos, texto_norm, col_nome, col_cpf, usar_valid
         return pd.DataFrame({"Resultado": ["Nenhum aluno encontrado."]})
         
     return pd.DataFrame(resultados).sort_values(by="Status")
-
+    
 # ==========================================
 # CONTROLADOR PRINCIPAL
 # ==========================================
