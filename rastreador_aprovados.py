@@ -134,7 +134,7 @@ def buscar_em_texto_corrido(df_alunos, texto_norm, col_nome, col_cpf, usar_valid
                 index_encontrado = index_possivel
                 tipo_match = "Parcial (Restrito)"
         
-        # Se após as tentativas ainda for -1, pula para o próximo aluno
+        # Se após as tentativas ainda for -1, pula para o próximo aluno.
         if index_encontrado == -1:
             continue
 
